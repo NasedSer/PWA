@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Push Тестирование</title>
+    <link rel="manifest" href="/manifest.json">
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .granted { background: #d4edda; color: #155724; }
+        .denied { background: #f8d7da; color: #721c24; }
+        .default { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>📱 PWA Push Тестирование</h1>
+    
+    <div id="permissionStatus" class="status default">
+        Статус разрешений: запрашивается...
+    </div>
+    
+    <button id="subscribeBtn" disabled>Подписаться на уведомления</button>
+    <button id="testNotificationBtn" disabled>Отправить тестовое уведомление</button>
+    <button id="unsubscribeBtn" disabled>Отписаться</button>
+    
+    <div id="subscriptionInfo" style="margin-top: 20px; display: none;">
+        <h3>Информация о подписке:</h3>
+        <pre id="subscriptionDetails" style="background: #f4f4f4; padding: 10px; overflow-x: auto;"></pre>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
