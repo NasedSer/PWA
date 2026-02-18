@@ -16,7 +16,12 @@ app = FastAPI()
 # CORS для локального тестирования
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_origins=[
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+        "https://NasedSer.github.io",  # Ваш GitHub Pages
+        "https://*.onrender.com"       # Все поддомены Render
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
