@@ -1,5 +1,6 @@
 // Конфигурация
-const SERVER_URL = 'https://pwa-791i.onrender.com';
+const SERVER_URL = 'http://localhost:5000';
+//const SERVER_URL = 'https://pwa-791i.onrender.com';
 let swRegistration = null;
 let pushSubscription = null;
 

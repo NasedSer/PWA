@@ -2,6 +2,7 @@ import os
 import json
 import sqlite3
 from pathlib import Path
+from urllib.parse import urlparse  # Добавлен импорт
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,7 +30,7 @@ app.add_middleware(
 # Конфигурация VAPID
 VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY")
 VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY")
-VAPID_CLAIMS = {"sub": "mailto:test@example.com"}
+VAPID_CLAIMS = {"sub": "mailto:test@example.com"}  # Оставлено без изменений
 
 # База данных SQLite
 DB_PATH = "subscriptions.db"
@@ -149,14 +150,22 @@ async def send_notification(request: Request):
             }
             
             try:
+                # Извлекаем origin из endpoint для параметра aud
+                parsed_url = urlparse(sub['endpoint'])
+                origin = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                
+                # Создаем копию базовых claims и добавляем динамический aud
+                dynamic_claims = VAPID_CLAIMS.copy()
+                dynamic_claims["aud"] = origin
+                
                 webpush(
                     subscription_info=subscription_info,
                     data=payload,
                     vapid_private_key=VAPID_PRIVATE_KEY,
-                    vapid_claims=VAPID_CLAIMS
+                    vapid_claims=dynamic_claims  # Используем динамические claims
                 )
                 success_count += 1
-                print(f"   ✅ Успешно отправлено")
+                print(f"   ✅ Успешно отправлено (aud: {origin})")
                 
             except WebPushException as ex:
                 error_count += 1
@@ -164,6 +173,11 @@ async def send_notification(request: Request):
                 
                 if ex.response:
                     print(f"      Статус: {ex.response.status_code}")
+                    try:
+                        error_body = ex.response.text()
+                        print(f"      Тело: {error_body[:200]}")
+                    except:
+                        pass
                     
                     # Если подписка истекла или не найдена - удаляем
                     if ex.response.status_code in [410, 404]:
@@ -174,7 +188,10 @@ async def send_notification(request: Request):
                         conn.close()
                         deleted_count += 1
                         print(f"      🗑️ Подписка удалена из БД")
-            
+                    elif ex.response.status_code == 403:
+                        print(f"      ⚠️ Ошибка 403 Forbidden - подписка сохранена")
+                        # Не удаляем подписку при 403
+                
             except Exception as e:
                 error_count += 1
                 print(f"   ❌ Неизвестная ошибка: {e}")
