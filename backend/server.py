@@ -231,6 +231,15 @@ async def debug_subscriptions():
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+@app.post("/api/debug/clear-all")
+async def clear_all():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM subscriptions")
+    conn.commit()
+    conn.close()
+    return JSONResponse({"status": "all subscriptions deleted"})
+
 @app.get("/")
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str = ""):
