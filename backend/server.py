@@ -19,7 +19,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5000",
         "http://127.0.0.1:5000",
-        "https://NasedSer.github.io",  # Ваш GitHub Pages
+        "https://pwa-791i.onrender.com",  # Ваш GitHub Pages
         "https://*.onrender.com"       # Все поддомены Render
     ],
     allow_methods=["*"],
