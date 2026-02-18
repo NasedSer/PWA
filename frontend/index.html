@@ -3,33 +3,310 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PWA Push Тестирование</title>
+    <title>PWA Push Уведомления</title>
     <link rel="manifest" href="/manifest.json">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
-        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
-        .granted { background: #d4edda; color: #155724; }
-        .denied { background: #f8d7da; color: #721c24; }
-        .default { background: #fff3cd; color: #856404; }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f5f5f5;
+        }
+        h1 { color: #333; text-align: center; }
+        button { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            cursor: pointer; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #bd2130; }
+        button.success { background: #28a745; }
+        button.success:hover { background: #218838; }
+        
+        .status { 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            text-align: center;
+            font-weight: bold;
+        }
+        .granted { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .denied { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .default { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        
+        .section { 
+            background: white; 
+            margin: 20px 0; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section h2 { 
+            margin-top: 0; 
+            color: #333; 
+            border-bottom: 2px solid #007bff; 
+            padding-bottom: 10px;
+        }
+        
+        .form-group { margin: 15px 0; }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-weight: bold; 
+            color: #555;
+        }
+        .form-group input, .form-group textarea, .form-group select { 
+            width: 100%; 
+            padding: 8px 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        
+        .radio-group { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 4px; 
+            border: 1px solid #dee2e6;
+        }
+        .radio-group label { 
+            display: block; 
+            margin: 8px 0; 
+            cursor: pointer;
+            font-weight: normal;
+        }
+        
+        .type-badge { 
+            display: inline-block; 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-size: 0.85em;
+            margin: 2px;
+            color: #333;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .types-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .type-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            transition: transform 0.2s;
+        }
+        .type-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        
+        .type-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .type-name { font-weight: bold; font-size: 1.1em; }
+        .type-actions button {
+            padding: 3px 8px;
+            font-size: 12px;
+            margin: 0 2px;
+        }
+        .type-description { 
+            color: #666; 
+            font-size: 0.9em; 
+            margin: 10px 0;
+            min-height: 40px;
+        }
+        .type-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 8px;
+            position: relative;
+        }
+        .modal-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            font-size: 20px;
+            color: #666;
+        }
+        
+        .stats-panel {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        
+        .flex-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        hr { margin: 20px 0; border: 0; border-top: 2px solid #dee2e6; }
+        
+        .info-text {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        #serverInfo {
+            text-align: center;
+            color: #666;
+            font-size: 0.8em;
+            margin-top: 20px;
+            padding: 10px;
+            border-top: 1px solid #dee2e6;
+        }
     </style>
 </head>
 <body>
-    <h1>📱 PWA Push Тестирование</h1>
+    <h1>📱 PWA Push Уведомления</h1>
     
     <div id="permissionStatus" class="status default">
         Статус разрешений: запрашивается...
     </div>
     
-    <button id="subscribeBtn" disabled>Подписаться на уведомления</button>
-    <button id="testNotificationBtn" disabled>Отправить тестовое уведомление</button>
-    <button id="unsubscribeBtn" disabled>Отписаться</button>
-    
-    <div id="subscriptionInfo" style="margin-top: 20px; display: none;">
-        <h3>Информация о подписке:</h3>
-        <pre id="subscriptionDetails" style="background: #f4f4f4; padding: 10px; overflow-x: auto;"></pre>
+    <!-- Секция управления типами подписок (админка) -->
+    <div class="section">
+        <h2>⚙️ Управление типами подписок</h2>
+        
+        <div class="flex-row">
+            <button id="addTypeBtn" class="success">➕ Добавить новый тип</button>
+            <button id="refreshTypesBtn">🔄 Обновить список</button>
+        </div>
+        
+        <div id="typesContainer" class="types-grid">
+            <!-- Типы будут загружаться динамически -->
+        </div>
     </div>
 
-    <script src="/app.js"></script>
+    <!-- Секция подписки -->
+    <div class="section">
+        <h2>📝 Управление подпиской</h2>
+        
+        <div class="form-group">
+            <label>Выберите тип подписки:</label>
+            <div id="subscriptionTypesRadio" class="radio-group">
+                <!-- Радио-кнопки будут загружаться динамически -->
+            </div>
+        </div>
+        
+        <div class="flex-row">
+            <button id="subscribeBtn">🔔 Подписаться</button>
+            <button id="unsubscribeBtn" class="danger">🔕 Отписаться</button>
+        </div>
+    </div>
+
+    <!-- Секция отправки сообщений -->
+    <div class="section">
+        <h2>📨 Отправка сообщения</h2>
+        
+        <div class="form-group">
+            <label>Кому отправить:</label>
+            <div id="targetTypesRadio" class="radio-group">
+                <!-- Радио-кнопки будут загружаться динамически, плюс "Всем" -->
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="messageTitle">Заголовок сообщения:</label>
+            <input type="text" id="messageTitle" placeholder="Например: Новая акция!" value="Тестовое уведомление">
+        </div>
+
+        <div class="form-group">
+            <label for="messageBody">Текст сообщения:</label>
+            <textarea id="messageBody" placeholder="Введите текст сообщения...">Это тестовое уведомление с сервера!</textarea>
+        </div>
+        
+        <button id="sendNotificationBtn">📤 Отправить сообщение</button>
+    </div>
+
+    <!-- Статистика -->
+    <div class="section">
+        <h2>📊 Статистика</h2>
+        <div id="statsContainer" class="stats-panel">
+            Загрузка...
+        </div>
+    </div>
+
+    <!-- Модальное окно для добавления/редактирования типа -->
+    <div id="typeModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="document.getElementById('typeModal').style.display='none'">&times;</span>
+            <h2 id="modalTitle">➕ Добавить тип подписки</h2>
+            
+            <div class="form-group">
+                <label for="typeKey">Ключ типа (только латиница, без пробелов):</label>
+                <input type="text" id="typeKey" placeholder="например: weekly_news">
+                <div class="info-text">Будет использоваться в коде и URL</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="typeName">Название типа:</label>
+                <input type="text" id="typeName" placeholder="например: Еженедельная рассылка">
+            </div>
+            
+            <div class="form-group">
+                <label for="typeDescription">Описание:</label>
+                <textarea id="typeDescription" placeholder="Описание для пользователей"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="typeColor">Цвет (HEX):</label>
+                <input type="color" id="typeColor" value="#e2e3e5">
+            </div>
+            
+            <div class="flex-row">
+                <button id="saveTypeBtn" class="success">💾 Сохранить</button>
+                <button id="cancelTypeBtn">Отмена</button>
+            </div>
+            
+            <input type="hidden" id="editingTypeKey">
+        </div>
+    </div>
+
+    <div id="serverInfo"></div>
+
+    <script type="module" src="/config.js"></script>
+    <script type="module" src="/app.js"></script>
 </body>
 </html>
