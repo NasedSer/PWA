@@ -13,14 +13,14 @@ load_dotenv()
 
 app = FastAPI()
 
-# CORS для локального тестирования
+# CORS для локального тестирования и продакшена
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5000",
         "http://127.0.0.1:5000",
-        "https://pwa-791i.onrender.com",  # Ваш GitHub Pages
-        "https://*.onrender.com"       # Все поддомены Render
+        "https://NasedSer.github.io",
+        "https://pwa-791i.onrender.com"
     ],
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,9 +34,15 @@ VAPID_CLAIMS = {"sub": "mailto:test@example.com"}
 # База данных SQLite
 DB_PATH = "subscriptions.db"
 
+def get_db():
+    """Получить соединение с БД"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 def init_db():
     """Инициализация базы данных"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS subscriptions (
@@ -50,6 +56,7 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
+    print("✅ База данных SQLite инициализирована")
 
 @app.on_event("startup")
 async def startup():
@@ -68,17 +75,34 @@ async def subscribe(request: Request):
         endpoint = subscription.get("endpoint")
         keys = subscription.get("keys", {})
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         c = conn.cursor()
-        c.execute(
-            "INSERT OR REPLACE INTO subscriptions (endpoint, auth_key, p256dh_key) VALUES (?, ?, ?)",
-            (endpoint, keys.get("auth"), keys.get("p256dh"))
-        )
+        
+        # Проверяем, существует ли уже такая подписка
+        c.execute("SELECT id FROM subscriptions WHERE endpoint = ?", (endpoint,))
+        existing = c.fetchone()
+        
+        if existing:
+            # Обновляем существующую
+            c.execute(
+                "UPDATE subscriptions SET auth_key = ?, p256dh_key = ? WHERE endpoint = ?",
+                (keys.get("auth"), keys.get("p256dh"), endpoint)
+            )
+            print(f"🔄 Обновлена подписка: {endpoint[:50]}...")
+        else:
+            # Создаем новую
+            c.execute(
+                "INSERT INTO subscriptions (endpoint, auth_key, p256dh_key, user_agent) VALUES (?, ?, ?, ?)",
+                (endpoint, keys.get("auth"), keys.get("p256dh"), request.headers.get('User-Agent', ''))
+            )
+            print(f"✅ Новая подписка: {endpoint[:50]}...")
+        
         conn.commit()
         conn.close()
         
         return JSONResponse({"status": "ok"})
     except Exception as e:
+        print(f"❌ Ошибка сохранения: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/api/send-notification")
@@ -94,20 +118,36 @@ async def send_notification(request: Request):
             "data": {"url": data.get("url", "/")}
         })
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         c = conn.cursor()
-        subscriptions = c.execute("SELECT endpoint, auth_key, p256dh_key FROM subscriptions").fetchall()
+        subscriptions = c.execute("SELECT id, endpoint, auth_key, p256dh_key FROM subscriptions").fetchall()
         conn.close()
         
+        print(f"\n{'='*60}")
+        print(f"📊 Найдено подписок в БД: {len(subscriptions)}")
+        
         success_count = 0
+        error_count = 0
+        deleted_count = 0
+        
         for sub in subscriptions:
+            # Определяем тип браузера/сервиса по endpoint
+            try:
+                service = sub['endpoint'].split('/')[2]
+            except:
+                service = "unknown"
+            
+            print(f"\n📌 Подписка #{sub['id']} - сервис: {service}")
+            print(f"   Endpoint: {sub['endpoint'][:80]}...")
+            
             subscription_info = {
-                "endpoint": sub[0],
+                "endpoint": sub['endpoint'],
                 "keys": {
-                    "auth": sub[1],
-                    "p256dh": sub[2]
+                    "auth": sub['auth_key'],
+                    "p256dh": sub['p256dh_key']
                 }
             }
+            
             try:
                 webpush(
                     subscription_info=subscription_info,
@@ -116,25 +156,81 @@ async def send_notification(request: Request):
                     vapid_claims=VAPID_CLAIMS
                 )
                 success_count += 1
+                print(f"   ✅ Успешно отправлено")
+                
             except WebPushException as ex:
-                if ex.response and ex.response.status_code == 410:
-                    # Удаляем истекшую подписку
-                    conn = sqlite3.connect(DB_PATH)
-                    c = conn.cursor()
-                    c.execute("DELETE FROM subscriptions WHERE endpoint = ?", (sub[0],))
-                    conn.commit()
-                    conn.close()
-                print(f"Ошибка отправки: {ex}")
+                error_count += 1
+                print(f"   ❌ Ошибка: {ex}")
+                
+                if ex.response:
+                    print(f"      Статус: {ex.response.status_code}")
+                    
+                    # Если подписка истекла или не найдена - удаляем
+                    if ex.response.status_code in [410, 404]:
+                        conn = get_db()
+                        c = conn.cursor()
+                        c.execute("DELETE FROM subscriptions WHERE id = ?", (sub['id'],))
+                        conn.commit()
+                        conn.close()
+                        deleted_count += 1
+                        print(f"      🗑️ Подписка удалена из БД")
+            
+            except Exception as e:
+                error_count += 1
+                print(f"   ❌ Неизвестная ошибка: {e}")
+        
+        print(f"\n{'='*60}")
+        print(f"📊 ИТОГИ ОТПРАВКИ:")
+        print(f"   ✅ Успешно: {success_count}")
+        print(f"   ❌ Ошибок: {error_count}")
+        print(f"   🗑️ Удалено: {deleted_count}")
+        print(f"   📊 Осталось в БД: {len(subscriptions) - deleted_count}")
         
         return JSONResponse({
             "status": "ok",
             "sent": success_count,
-            "total": len(subscriptions)
+            "failed": error_count,
+            "deleted": deleted_count,
+            "total_original": len(subscriptions),
+            "total_remaining": len(subscriptions) - deleted_count
         })
+        
     except Exception as e:
+        print(f"❌ Критическая ошибка в send_notification: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
-# Раздача статических файлов фронтенда
+@app.get("/api/debug/subscriptions")
+async def debug_subscriptions():
+    """Временный эндпоинт для просмотра всех подписок (только для отладки!)"""
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        subscriptions = c.execute("SELECT endpoint, auth_key, p256dh_key, created_at FROM subscriptions").fetchall()
+        conn.close()
+        
+        result = []
+        for sub in subscriptions:
+            short_endpoint = sub['endpoint'][:50] + "..."
+            try:
+                service = sub['endpoint'].split('/')[2]
+            except:
+                service = "unknown"
+            
+            result.append({
+                "endpoint_short": short_endpoint,
+                "service": service,
+                "has_auth": bool(sub['auth_key']),
+                "has_p256dh": bool(sub['p256dh_key']),
+                "created_at": sub['created_at']
+            })
+        
+        return JSONResponse({
+            "total": len(result),
+            "subscriptions": result
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 @app.get("/")
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str = ""):
